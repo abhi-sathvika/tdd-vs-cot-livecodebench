@@ -129,8 +129,8 @@ The experiment does not require a local GPU because model inference is performed
 ## 1. Clone this repository
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd tdd_agent_replication_kit
+git clone https://github.com/abhi-sathvika/tdd-vs-cot-livecodebench.git
+cd tdd-vs-cot-livecodebench
 ```
 
 ## 2. Install Python 3.12
