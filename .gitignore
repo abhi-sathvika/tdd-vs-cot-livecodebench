@@ -1,0 +1,25 @@
+# Python virtual environment
+.venv/
+
+# Secrets / local API config
+config/local_model.yaml
+.env
+
+# Generated experiment outputs
+runs/
+
+# Third-party repositories cloned locally
+upstream/
+official_livecodebench/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
