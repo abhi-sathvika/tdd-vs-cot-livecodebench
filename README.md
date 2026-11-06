@@ -480,18 +480,8 @@ These checkpoint results should be interpreted as a partial replication rather t
 
 ---
 
-# Files That Must Not Be Committed
+### AI Contributions
+We used ChatGPT to assist with planning the experimental setup, developing and debugging parts of the replication workflow, troubleshooting environment and dependency issues, and understanding the LiveCodeBench evaluation process. AI assistance was also used to help interpret experimental results and identify possible directions for further investigation.
 
-The following contain generated data, third-party repositories, environments, or secrets:
-
-```text
-.venv/
-upstream/
-official_livecodebench/
-runs/
-config/local_model.yaml
-.env
-__pycache__/
-```
-
-API keys must never be committed to the repository.
+### Human Contributions
+Our team selected the research paper, defined the scope of the replication, configured the experimental environment, executed the experiments, and evaluated the generated solutions. We also analyzed the results, compared the prompting strategies, and determined the limitations and next steps of our investigation.
