@@ -207,8 +207,8 @@ The experiment does not require a local GPU because model inference is performed
 ## 1. Clone this repository
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd tdd_agent_replication_kit
+git clone https://github.com/abhi-sathvika/tdd-vs-cot-livecodebench.git
+cd tdd-vs-cot-livecodebench
 ```
 
 ## 2. Install Python 3.12
@@ -558,18 +558,8 @@ These checkpoint results should be interpreted as a partial replication rather t
 
 ---
 
-# Files That Must Not Be Committed
+### AI Contributions
+We used ChatGPT to assist with planning the experimental setup, developing and debugging parts of the replication workflow, troubleshooting environment and dependency issues, and understanding the LiveCodeBench evaluation process. AI assistance was also used to help interpret experimental results and identify possible directions for further investigation.
 
-The following contain generated data, third-party repositories, environments, or secrets:
-
-```text
-.venv/
-upstream/
-official_livecodebench/
-runs/
-config/local_model.yaml
-.env
-__pycache__/
-```
-
-API keys must never be committed to the repository.
+### Human Contributions
+Our team selected the research paper, defined the scope of the replication, configured the experimental environment, executed the experiments, and evaluated the generated solutions. We also analyzed the results, compared the prompting strategies, and determined the limitations and next steps of our investigation.
