@@ -117,7 +117,12 @@
       -1.8333333333333333,
       2.0555555555555554
     ],
-    "signflip_p": 0.9130043497825109
+    "signflip_p": 0.9130043497825109,
+    "model_contribution_counts": {
+      "3": 93,
+      "2": 5,
+      "1": 2
+    }
   },
   "notes": [
     "Technical errors are excluded from correctness denominators and reported separately.",
@@ -132,5 +137,62 @@
       0.6666666666666666
     ],
     "signflip_p": 0.31153442327883607
+  },
+  "model_sensitivity_technical_as_failure": {
+    "anthropic": {
+      "tdd_minus_cot_pp": 0.33333333333333337,
+      "cluster_bootstrap_95ci_pp": [
+        -3.6666666666666665,
+        4.0
+      ],
+      "signflip_p": 1.0
+    },
+    "deepseek": {
+      "tdd_minus_cot_pp": -1.666666666666667,
+      "cluster_bootstrap_95ci_pp": [
+        -4.0,
+        0.33333333333333326
+      ],
+      "signflip_p": 0.22773861306934653
+    },
+    "openai": {
+      "tdd_minus_cot_pp": -1.6666666666666667,
+      "cluster_bootstrap_95ci_pp": [
+        -5.666666666666667,
+        2.0
+      ],
+      "signflip_p": 0.5058747062646868
+    }
+  },
+  "reliability": {
+    "anthropic": {
+      "cot": {
+        "api_error": 4,
+        "truncated_response": 2
+      },
+      "tdd": {
+        "api_error": 16,
+        "truncated_response": 3
+      }
+    },
+    "deepseek": {
+      "cot": {
+        "truncated_response": 16,
+        "api_error": 1
+      },
+      "tdd": {
+        "truncated_response": 25,
+        "api_error": 9
+      }
+    },
+    "openai": {
+      "cot": {},
+      "tdd": {}
+    }
+  },
+  "settings": {
+    "seed": 20261114,
+    "bootstrap_reps": 10000,
+    "permutation_reps": 20000
   }
 }

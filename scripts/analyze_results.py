@@ -1,5 +1,5 @@
 import argparse, csv, json, math, pathlib, random, statistics
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 def mean(xs): return sum(xs)/len(xs) if xs else float("nan")
 
@@ -41,6 +41,20 @@ rows=list(csv.DictReader(open(a.input, newline="")))
 required={"problem_id","model","condition","attempt","status","passed"}
 if not rows or not required.issubset(rows[0]):
     raise SystemExit(f"CSV must include columns: {sorted(required)}")
+keys = [(r['problem_id'], r['model'], r['condition'], r['attempt']) for r in rows]
+if len(set(keys)) != len(keys):
+    raise SystemExit('Duplicate problem/model/condition/attempt rows')
+expected = {(pid, m, c, attempt) for pid in {r['problem_id'] for r in rows}
+            for m in {r['model'] for r in rows} for c in ('cot', 'tdd')
+            for attempt in ('1', '2', '3')}
+if set(keys) != expected:
+    raise SystemExit('Incomplete or unexpected design: expected three attempts in every problem/model/condition cell')
+if any(r['status'] not in ('evaluated', 'technical_error') or
+       (r['status'] == 'evaluated' and r['passed'] not in ('0', '1')) or
+       (r['status'] == 'technical_error' and r['passed'] != '') for r in rows):
+    raise SystemExit('Invalid status/outcome combination')
+if a.bootstrap_reps < 1 or a.permutation_reps < 1:
+    raise SystemExit('Resampling counts must be positive')
 models=sorted({r["model"] for r in rows})
 conditions={"cot","tdd"}
 if not conditions.issubset({r["condition"] for r in rows}):
@@ -132,6 +146,20 @@ if sensitivity_diffs:
         "tdd_minus_cot_pp":mean(sensitivity_diffs)*100,
         "cluster_bootstrap_95ci_pp":[lo*100,hi*100],
         "signflip_p":signflip_p(sensitivity_diffs,a.permutation_reps,seed=20261115)}
+report['model_sensitivity_technical_as_failure'] = {}
+for m in models:
+    ds = [mean(conservative[(m,'tdd',pid)]) - mean(conservative[(m,'cot',pid)])
+          for pid in sorted({r['problem_id'] for r in rows})]
+    lo, hi = bootstrap_ci(ds, a.bootstrap_reps)
+    report['model_sensitivity_technical_as_failure'][m] = {
+        'tdd_minus_cot_pp': mean(ds)*100, 'cluster_bootstrap_95ci_pp': [lo*100,hi*100],
+        'signflip_p': signflip_p(ds,a.permutation_reps)}
+report['overall']['model_contribution_counts'] = dict(Counter(len(v) for v in overall_problem.values()))
+report['reliability'] = {m: {c: dict(Counter(r['error_type'] for r in rows
+    if r['model']==m and r['condition']==c and r['status']=='technical_error'))
+    for c in ('cot','tdd')} for m in models}
+report['settings'] = {'seed': 20261114, 'bootstrap_reps': a.bootstrap_reps,
+                      'permutation_reps': a.permutation_reps}
 valid_models=[m for m in models if report["models"][m]["signflip_p"] is not None]
 adjusted=holm([report["models"][m]["signflip_p"] for m in valid_models])
 for m,pv in zip(valid_models,adjusted):
@@ -147,3 +175,39 @@ with (out/"summary.csv").open("w",newline="") as f:
             w.writerow([m,c,x["passed"],x["evaluated"],x["pass_rate"],x["technical_errors"],x["attempts_total"]])
 print(json.dumps(report,indent=2))
 print(f"\nSaved {out/'analysis.json'} and {out/'summary.csv'}")
+
+# Standalone vector figure requires no plotting dependency.
+entries = [('Overall', report['overall'])] + [(m,report['models'][m]) for m in models]
+svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="800" height="300" viewBox="0 0 800 300">',
+       '<rect width="800" height="300" fill="white"/>',
+       '<text x="20" y="25" font-size="18">TDD minus CoT: percentage points, 95% bootstrap intervals</text>']
+limits = [v for _,x in entries for v in x['cluster_bootstrap_95ci_pp']] + [0]
+low, high = min(limits)-1, max(limits)+1
+scale = lambda x: 180 + (x-low)/(high-low)*560
+svg.append(f'<path d="M {scale(0)} 45 V 230" stroke="gray" stroke-dasharray="4"/>')
+for i,(label,x) in enumerate(entries):
+    y=65+i*45; lo,hi=x['cluster_bootstrap_95ci_pp']; effect=x['tdd_minus_cot_pp']
+    svg.extend([f'<text x="20" y="{y+5}">{label}</text>',
+        f'<path d="M {scale(lo)} {y} H {scale(hi)}" stroke="#2463ad" stroke-width="3"/>',
+        f'<circle cx="{scale(effect)}" cy="{y}" r="5" fill="#2463ad"/>'])
+svg.append(f'<text x="180" y="265">{low:.1f}</text><text x="710" y="265">{high:.1f}</text></svg>')
+(out/'effects.svg').write_text(''.join(svg))
+lines = ['# TDD versus CoT statistical report', '',
+    'Primary policy: exclude technical failures, as prespecified according to investigator confirmation. Pilot and calibration data are excluded.', '',
+    'Effects average within-problem TDD minus CoT correctness. Attempts remain clustered by problem; overall effects average available paired models within each problem. Aggregate pass rates use evaluated attempts and can differ from paired effects.', '',
+    '| Comparison | Paired problems | Effect (pp) | 95% bootstrap CI | Raw p | Holm p |',
+    '|---|---:|---:|---|---:|---:|']
+for label,x in entries:
+    lo,hi=x['cluster_bootstrap_95ci_pp']
+    lines.append(f"| {label} | {x['paired_problem_count']} | {x['tdd_minus_cot_pp']:.2f} | [{lo:.2f}, {hi:.2f}] | {x['signflip_p']:.4f} | {x.get('holm_adjusted_p', '—')} |")
+lines += ['', '## Sensitivity and reliability', '',
+    'Counting technical failures as unsuccessful attempts gives an overall effect of '
+    f"{report['sensitivity_technical_as_failure']['tdd_minus_cot_pp']:.2f} pp. Model-specific estimates and uncertainty are in analysis.json.", '',
+    'Excluding truncations estimates correctness conditional on a usable response. Differential failures can affect comparisons.', '',
+    '```json', json.dumps(report['reliability'],indent=2), '```', '',
+    '## Resources and interpretation', '',
+    'Token totals, estimated USD costs, and mean latency by condition are in analysis.json. Costs are estimates, not invoices.', '',
+    'The overall result does not establish improved correctness or equivalence. Conclusions apply to this fixed benchmark subset and these three models. Bootstrap intervals and sign-flip tests use different constructions and need not agree at a threshold.', '',
+    'Overall model contribution counts: '+str(report['overall']['model_contribution_counts']), '',
+    '![Paired effects](effects.svg)']
+(out/'report.md').write_text('\n'.join(lines)+'\n')
