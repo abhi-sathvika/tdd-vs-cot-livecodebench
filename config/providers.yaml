@@ -1,0 +1,50 @@
+providers:
+  openai:
+    model: gpt-6-luna
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    token_parameter: max_completion_tokens
+    max_output_tokens: 4096
+    temperature_supported: false
+    reasoning_effort: none
+    input_usd_per_million: 0.10
+    cached_input_usd_per_million: 0.01
+    output_usd_per_million: 0.50
+    context_tokens: 1050000
+    max_output_limit_tokens: 128000
+    api: openai_chat_completions
+
+  deepseek:
+    model: deepseek-flash
+    base_url: https://api.deepseek.com
+    api_key_env: DEEPSEEK_API_KEY
+    token_parameter: max_tokens
+    # Calibration showed 4/20 outputs per condition ended at the 4096-token
+    # ceiling before emitting code. Validate this 8192-token setting before
+    # the confirmatory run.
+    max_output_tokens: 8192
+    temperature_supported: true
+    temperature: 1.0
+    input_usd_per_million_off_peak: 0.15
+    input_usd_per_million_peak: 0.30
+    cached_input_usd_per_million_off_peak: 0.003
+    cached_input_usd_per_million_peak: 0.006
+    output_usd_per_million_off_peak: 0.60
+    output_usd_per_million_peak: 1.20
+    context_tokens: 1000000
+    max_output_limit_tokens: 384000
+    api: openai_chat_completions
+
+  anthropic:
+    model: claude-haiku-5-5
+    base_url: https://api.anthropic.com
+    api_key_env: ANTHROPIC_API_KEY
+    token_parameter: max_tokens
+    max_output_tokens: 4096
+    temperature_supported: true
+    temperature: 1.0
+    input_usd_per_million_from: 0.10
+    output_usd_per_million_from: 0.50
+    context_tokens: 1000000
+    max_output_limit_tokens: 128000
+    api: anthropic_messages

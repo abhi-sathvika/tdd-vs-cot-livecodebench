@@ -1,9 +1,12 @@
 # Python virtual environment
 .venv/
+.proxy-venv/
 
 # Secrets / local API config
 config/local_model.yaml
 .env
+.env.*
+!.env.example
 
 # Generated experiment outputs
 runs/
@@ -11,6 +14,11 @@ runs/
 # Third-party repositories cloned locally
 upstream/
 official_livecodebench/
+
+# Provider proxy/runtime state and generated reports
+.litellm/
+results/analysis/
+data_private/
 
 # Python cache files
 __pycache__/

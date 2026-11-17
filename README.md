@@ -11,6 +11,84 @@ The goal is to determine whether TDD-style prompting improves functional correct
 
 The original TDD-Agent implementation is used for prediction rather than reimplemented in this repository.
 
+> Confirmatory experiment note (2026-11-14): the original 100-task checkpoint is pilot evidence
+> only. New calibration and main runs live under `runs/final_experiment/` and must never be pooled
+> with the checkpoint.
+
+## Confirmatory design
+
+- Models: `gpt-6-luna`, `deepseek-flash`, and `claude-haiku-5-5`.
+- Conditions: upstream `cot` and `tdd` prompt modes.
+- Calibration: 20 fixed tasks x 3 models x 2 conditions x 1 attempt.
+- Main: 100 frozen tasks x 3 models x 2 conditions x 3 attempts.
+- Problem IDs: `data/problem_manifest_checkpoint.csv`, recovered identically from both pilot files.
+- Smoke and calibration use tracked one- and twenty-ID subsets of that same frozen manifest.
+- Dataset: `livecodebench/code_generation_lite`, `release_v6`.
+- Evaluator commit: `28fef95ea8c9f7a547c8329f2cd3d32b92c1fa24`.
+- TDD-Agent commit: `bb08c6b05426c63e75633e4eda9f873ae44fb652` plus the tracked patch.
+
+This is a test-first versus code-first prompting comparison, not an executable test-and-repair
+TDD loop.
+
+## Secure provider setup
+
+Copy `.env.example` to the ignored `.env` and enter keys locally. Never place credentials in YAML,
+source files, logs, screenshots, or chat. `scripts/init_env.py` creates a local-only LiteLLM master
+key without displaying it. `scripts/prepare_provider.py` writes only the environment-variable name
+to the ignored upstream config; it never copies a provider credential.
+
+Model details, limits, pricing, and official documentation links are recorded in
+`docs/model_verification.md`.
+
+## Commands
+
+```bash
+source .venv/bin/activate
+bash scripts/test.sh
+
+# Plans only: no directories and no API requests
+python scripts/run_model_matrix.py --phase smoke
+python scripts/run_model_matrix.py --phase calibration
+python scripts/run_model_matrix.py --phase main
+
+# Paid execution requires an explicit --execute
+python scripts/run_model_matrix.py --phase smoke --providers openai --execute
+```
+
+Anthropic uses the isolated `.proxy-venv` LiteLLM process configured by
+`config/litellm_config.yaml`. The local proxy master key authenticates only local callers; the
+Anthropic provider key remains in the environment.
+
+Start the local-only adapter in a separate terminal before an Anthropic run:
+
+```bash
+set -a
+source .env
+set +a
+.proxy-venv/bin/litellm --config config/litellm_config.yaml --host 127.0.0.1 --port 4000
+```
+
+The proxy health endpoint can be checked without making a provider request at
+`http://127.0.0.1:4000/health/liveliness`.
+
+Generated code is evaluated with the network-disabled Docker runner:
+
+```bash
+bash scripts/build_evaluator_image.sh
+# One-time: create the ignored 100-task bundle from the pinned release's Arrow cache.
+python scripts/freeze_evaluator_bundle.py \
+  --arrow-dir "$HOME/.cache/huggingface/datasets/livecodebench___code_generation_lite/release_latest-version_tag=release_v6/0.0.0/4c038560f391c4c05fdf7fd7ae61ae0e6dbd8672f8fe5b95597b78a8dc40a417"
+python scripts/evaluate_isolated.py runs/RUN/cot.json --execute --release_version release_v6
+```
+
+The container has no network, a read-only root filesystem, dropped Linux capabilities, resource
+limits, and runs as the invoking WSL user. It mounts the ignored frozen benchmark bundle read-only;
+only the selected run directory is writable. The bundle includes private tests and must never be
+committed. Its expected SHA-256 is
+`06a57c02146164a89d76db21401dd809245c22602cb6d7c406708b8c619c9463`.
+Evaluator JSON can be converted with `scripts/build_attempts.py`, combined with
+`scripts/combine_attempts.py`, and analyzed with `scripts/analyze_results.py`.
+
 ## Original Study
 
 Paper:

@@ -1,0 +1,7 @@
+model,condition,passed,evaluated,pass_rate,technical_errors,attempts_total
+anthropic,cot,226,294,0.7687074829931972,6,300
+anthropic,tdd,227,281,0.8078291814946619,19,300
+deepseek,cot,225,283,0.7950530035335689,17,300
+deepseek,tdd,220,266,0.8270676691729323,34,300
+openai,cot,215,300,0.7166666666666667,0,300
+openai,tdd,210,300,0.7,0,300

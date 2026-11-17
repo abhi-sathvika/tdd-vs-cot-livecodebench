@@ -1,0 +1,201 @@
+diff --git a/LiveCodeBench/predict.py b/LiveCodeBench/predict.py
+index 3e173c4..d5d36cb 100644
+--- a/LiveCodeBench/predict.py
++++ b/LiveCodeBench/predict.py
+@@ -2,9 +2,10 @@ import json
+ import yaml
+ import re
+ import argparse
++import os
+ import time
+ from dataclasses import dataclass
+-from openai import OpenAI
++from openai import OpenAI, APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
+ from tqdm import tqdm
+ import concurrent.futures
+ from functools import partial
+@@ -40,6 +41,20 @@ def load_config(config_path):
+         return yaml.safe_load(f)
+ 
+ 
++def select_tasks(tasks, start=0, end=None, question_ids_file=None):
++    tasks = sorted(tasks, key=lambda task: task.question_id)
++    if not question_ids_file:
++        return tasks[start:end]
++    with open(question_ids_file, encoding='utf-8') as f:
++        wanted = {line.strip().split(',')[0] for line in f if line.strip()}
++    wanted.discard('question_id')
++    available = {str(task.question_id) for task in tasks}
++    missing = wanted - available
++    if missing:
++        raise ValueError(f"Question IDs absent from frozen dataset: {sorted(missing)}")
++    return [task for task in tasks if str(task.question_id) in wanted]
++
++
+ def extract_code(text):
+     if text is None:
+         return ""
+@@ -61,7 +76,7 @@ def split_model_kwargs(model_kwargs):
+     standard_keys = {
+         'temperature', 'top_p', 'max_tokens', 'stop',
+         'presence_penalty', 'frequency_penalty', 'stream', 'seed',
+-        'reasoning_effort', 'verbosity'
++        'reasoning_effort', 'verbosity', 'max_completion_tokens'
+     }
+     for k, v in (model_kwargs or {}).items():
+         if k in standard_keys:
+@@ -73,9 +88,10 @@ def split_model_kwargs(model_kwargs):
+     return kwargs
+ 
+ 
+-def chat_completion(client, model_name, messages, model_kwargs, max_retries=5, timeout=120):
++def chat_completion(client, model_name, messages, model_kwargs, max_retries=5, timeout=120, detailed=False):
+     kwargs = split_model_kwargs(model_kwargs)
+     for attempt in range(max_retries):
++        started = time.monotonic()
+         try:
+             response = client.chat.completions.create(
+                 model=model_name,
+@@ -84,23 +100,33 @@ def chat_completion(client, model_name, messages, model_kwargs, max_retries=5, t
+                 **kwargs
+             )
+ 
+-            return response.choices[0].message.content
+-        except Exception as e:
++            usage = getattr(response, 'usage', None)
++            result = {
++                'text': response.choices[0].message.content or '',
++                'finish_reason': response.choices[0].finish_reason,
++                'latency_seconds': time.monotonic() - started,
++                'input_tokens': getattr(usage, 'prompt_tokens', None),
++                'output_tokens': getattr(usage, 'completion_tokens', None),
++                'total_tokens': getattr(usage, 'total_tokens', None),
++                'provider_request_id': getattr(response, '_request_id', None),
++            }
++            return result if detailed else result['text']
++        except (APIConnectionError, APITimeoutError, InternalServerError, RateLimitError) as e:
+             if attempt == max_retries - 1:
+-                print(f"\n[Error] API call failed after {max_retries} attempts: {e}")
++                print(f"\n[Error] transient API call failed after {max_retries} attempts: {type(e).__name__}")
+                 raise
+             wait_time = min(2 ** attempt, 60)
+-            print(f"\n[Warning] API call failed: {e}. Retrying in {wait_time} seconds...")
++            print(f"\n[Warning] transient API failure {type(e).__name__}; retrying in {wait_time} seconds...")
+             time.sleep(wait_time)
+ 
+ 
+-def chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=4, max_retries=5, timeout=120):
++def chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=4, max_retries=5, timeout=120, detailed=False):
+     if num_samples == 1:
+-        return [chat_completion(client, model_name, messages, model_kwargs, max_retries=max_retries, timeout=timeout)]
++        return [chat_completion(client, model_name, messages, model_kwargs, max_retries=max_retries, timeout=timeout, detailed=detailed)]
+ 
+     def _single_call(_):
+         try:
+-            return chat_completion(client, model_name, messages, model_kwargs, max_retries=max_retries, timeout=timeout)
++            return chat_completion(client, model_name, messages, model_kwargs, max_retries=max_retries, timeout=timeout, detailed=detailed)
+         except Exception:
+             return None
+ 
+@@ -142,11 +168,12 @@ def build_samples_for_task(client, model_cfg, prompt_cfg, task, mode, num_sample
+     if mode == 'cot':
+         messages = [{'role': 'system', 'content': prompt_cfg['cot_system_prompt']}]
+         messages.append({'role': 'user', 'content': format_prompt(task)})
+-        texts = chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=inner_workers, max_retries=max_retries, timeout=timeout)
++        texts = chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=inner_workers, max_retries=max_retries, timeout=timeout, detailed=True)
+         return [
+             {
+                 'intermediate': '',
+-                'code': t
++                'code': t['text'],
++                'response_metadata': t,
+             } 
+             for t in texts
+         ]
+@@ -277,11 +304,12 @@ def build_samples_for_task(client, model_cfg, prompt_cfg, task, mode, num_sample
+                         'starter_code': task.starter_code,
+                     })
+         })
+-        texts = chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=inner_workers, max_retries=max_retries, timeout=timeout)
++        texts = chat_completion_n(client, model_name, messages, model_kwargs, num_samples, inner_workers=inner_workers, max_retries=max_retries, timeout=timeout, detailed=True)
+         return [
+             {
+                 'intermediate': '',
+-                'code': t
++                'code': t['text'],
++                'response_metadata': t,
+             } 
+             for t in texts
+         ]
+@@ -366,7 +394,9 @@ def process_single_task_wrapper(task, client, model_cfg, prompt_cfg, mode, num_s
+         'mode': mode,
+         'num_samples': num_samples,
+         'raw_response': [],
+-        'code_list': []
++        'code_list': [],
++        'generation_status': 'pending',
++        'api_error': None,
+     }
+     try:
+         samples = build_samples_for_task(client, model_cfg, prompt_cfg, task, mode, num_samples, inner_workers, max_retries, timeout)
+@@ -377,12 +407,16 @@ def process_single_task_wrapper(task, client, model_cfg, prompt_cfg, mode, num_s
+                 samples = samples[:num_samples]
+         res['raw_response'] = samples
+         res['code_list'] = [extract_code(s['code']) for s in samples]
++        res['generation_status'] = 'completed'
+     except Exception as e:
+         samples = []
+         for _ in range(num_samples):
+             sample = {'code': 'Error', 'intermediate': 'Error'}
+             samples.append(sample)
+         res['code_list'] = [extract_code(s['code']) for s in samples]
++        res['raw_response'] = samples
++        res['generation_status'] = 'technical_error'
++        res['api_error'] = {'type': type(e).__name__, 'message': str(e)[:500]}
+     return res
+ 
+ 
+@@ -399,6 +433,7 @@ def main():
+     parser.add_argument('--timeout', type=int, default=120, help='Timeout in seconds for each API request')
+     parser.add_argument('--start', type=int, default=0, help='The start to predict')
+     parser.add_argument('--end', type=int, default=None, help='The end to predict')
++    parser.add_argument('--question_ids_file', type=str, default=None, help='Optional newline/CSV question ID manifest')
+     args = parser.parse_args()
+ 
+     config = load_config(args.config_path)
+@@ -411,10 +446,11 @@ def main():
+     if num_samples < 1:
+         raise ValueError('num_samples must be at least 1')
+ 
+-    client = OpenAI(
+-        base_url=model_cfg.get('base_url'),
+-        api_key=model_cfg.get('api_key', 'EMPTY')
+-    )
++    key_env = model_cfg.get('api_key_env')
++    api_key = os.getenv(key_env) if key_env else model_cfg.get('api_key')
++    if not api_key:
++        raise RuntimeError(f"Missing required environment variable: {key_env}")
++    client = OpenAI(base_url=model_cfg.get('base_url'), api_key=api_key)
+ 
+     dataset_name = config['data']['dataset']
+     release = config['data']['release']
+@@ -422,7 +458,7 @@ def main():
+     start_date = config['data']['start_date']
+     end_date = config['data']['end_date']
+     try:
+-        tasks = load_dataset(dataset_name, version_tag=release)
++        tasks = load_dataset(dataset_name, version_tag=release, trust_remote_code=True)
+     except ValueError as e:
+         msg = str(e)
+         if "Couldn't find cache for" in msg:
+@@ -444,8 +480,7 @@ def main():
+     print(f"Loaded {len(tasks)} tasks. Generating {num_samples} samples per task in '{mode}' mode...")
+ 
+ 
+-    tasks.sort(key=lambda task: task.question_id)
+-    tasks = tasks[args.start : args.end]
++    tasks = select_tasks(tasks, args.start, args.end, args.question_ids_file)
+         
+     output_path = args.output_path or config['data']['output_path']
+     print(f"Using ThreadPoolExecutor with {args.max_workers} outer task workers and {args.inner_workers} inner workers for sampling.")
+

@@ -1,5 +1,6 @@
 import json
 import sys
+import argparse
 
 from lcb_runner.runner.parser import get_args
 from lcb_runner.utils.scenarios import Scenario
@@ -9,6 +10,21 @@ from lcb_runner.runner.scenario_router import (
     sort_and_extract_save_results,
     get_metrics,
 )
+from lcb_runner.benchmarks.code_generation import CodeGenerationProblem
+
+def pop_bundle_arg(argv):
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--benchmark_bundle")
+    known, remaining = parser.parse_known_args(argv[1:])
+    sys.argv = [argv[0], *remaining]
+    return known.benchmark_bundle
+
+def load_bundle(path):
+    with open(path) as f:
+        rows = json.load(f)
+    if not isinstance(rows, list) or not rows:
+        raise SystemExit("Benchmark bundle must contain a non-empty JSON list")
+    return [CodeGenerationProblem(**row) for row in rows]
 
 def qid_of(instance):
     if hasattr(instance, "question_id"):
@@ -20,9 +36,15 @@ def qid_of(instance):
     )
 
 def main():
+    bundle_path = pop_bundle_arg(sys.argv)
     args = get_args()
-
-    benchmark, _ = build_prompt_benchmark(args)
+    if bundle_path:
+        if args.scenario not in [Scenario.codegeneration, Scenario.selfrepair]:
+            raise SystemExit("A frozen benchmark bundle supports code generation only")
+        benchmark = load_bundle(bundle_path)
+        print("Loaded frozen benchmark bundle:", bundle_path)
+    else:
+        benchmark, _ = build_prompt_benchmark(args)
 
     with open(args.custom_output_file, "r") as f:
         rows = json.load(f)

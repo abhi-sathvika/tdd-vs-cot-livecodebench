@@ -1,0 +1,136 @@
+{
+  "input": "results/analysis/main_20261116/attempts.csv",
+  "models": {
+    "anthropic": {
+      "rates": {
+        "cot": {
+          "passed": 226,
+          "evaluated": 294,
+          "pass_rate": 0.7687074829931972,
+          "technical_errors": 6,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.7533333333333333,
+          "input_tokens_total": 167871.0,
+          "output_tokens_total": 381372.0,
+          "cost_usd_total": 0.2074731,
+          "latency_seconds_mean": 5.9561578482804665
+        },
+        "tdd": {
+          "passed": 227,
+          "evaluated": 281,
+          "pass_rate": 0.8078291814946619,
+          "technical_errors": 19,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.7566666666666667,
+          "input_tokens_total": 219471.0,
+          "output_tokens_total": 605405.0,
+          "cost_usd_total": 0.3246496,
+          "latency_seconds_mean": 8.787142711766938
+        }
+      },
+      "paired_problem_count": 97,
+      "tdd_minus_cot_pp": 2.0618556701030926,
+      "cluster_bootstrap_95ci_pp": [
+        -1.7182130584192439,
+        5.498281786941582
+      ],
+      "signflip_p": 0.3733813309334533,
+      "holm_adjusted_p": 0.7467626618669067
+    },
+    "deepseek": {
+      "rates": {
+        "cot": {
+          "passed": 225,
+          "evaluated": 283,
+          "pass_rate": 0.7950530035335689,
+          "technical_errors": 17,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.75,
+          "input_tokens_total": 126639.0,
+          "output_tokens_total": 638176.0,
+          "cost_usd_total": 0.8038029,
+          "latency_seconds_mean": 13.108709425030101
+        },
+        "tdd": {
+          "passed": 220,
+          "evaluated": 266,
+          "pass_rate": 0.8270676691729323,
+          "technical_errors": 34,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.7333333333333333,
+          "input_tokens_total": 154839.0,
+          "output_tokens_total": 1068046.0,
+          "cost_usd_total": 1.3281068999999999,
+          "latency_seconds_mean": 20.407643977716628
+        }
+      },
+      "paired_problem_count": 94,
+      "tdd_minus_cot_pp": 1.5957446808510638,
+      "cluster_bootstrap_95ci_pp": [
+        0.3546099290780142,
+        3.1914893617021276
+      ],
+      "signflip_p": 0.1271936403179841,
+      "holm_adjusted_p": 0.38158092095395235
+    },
+    "openai": {
+      "rates": {
+        "cot": {
+          "passed": 215,
+          "evaluated": 300,
+          "pass_rate": 0.7166666666666667,
+          "technical_errors": 0,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.7166666666666667,
+          "input_tokens_total": 120180.0,
+          "output_tokens_total": 79402.0,
+          "cost_usd_total": 0.051719,
+          "latency_seconds_mean": 3.4401575115932066
+        },
+        "tdd": {
+          "passed": 210,
+          "evaluated": 300,
+          "pass_rate": 0.7,
+          "technical_errors": 0,
+          "attempts_total": 300,
+          "conservative_pass_rate": 0.7,
+          "input_tokens_total": 148980.0,
+          "output_tokens_total": 199820.0,
+          "cost_usd_total": 0.114808,
+          "latency_seconds_mean": 5.808138911173301
+        }
+      },
+      "paired_problem_count": 100,
+      "tdd_minus_cot_pp": -1.6666666666666667,
+      "cluster_bootstrap_95ci_pp": [
+        -5.666666666666667,
+        2.0
+      ],
+      "signflip_p": 0.512224388780561,
+      "holm_adjusted_p": 0.7467626618669067
+    }
+  },
+  "overall": {
+    "paired_problem_count": 100,
+    "tdd_minus_cot_pp": 0.16666666666666669,
+    "cluster_bootstrap_95ci_pp": [
+      -1.8333333333333333,
+      2.0555555555555554
+    ],
+    "signflip_p": 0.9130043497825109
+  },
+  "notes": [
+    "Technical errors are excluded from correctness denominators and reported separately.",
+    "Uncertainty resamples whole problem IDs; attempts within a problem are not treated as independent clusters.",
+    "Model-specific permutation p-values are Holm-adjusted."
+  ],
+  "sensitivity_technical_as_failure": {
+    "paired_problem_count": 100,
+    "tdd_minus_cot_pp": -1.0,
+    "cluster_bootstrap_95ci_pp": [
+      -2.6666666666666665,
+      0.6666666666666666
+    ],
+    "signflip_p": 0.31153442327883607
+  }
+}

@@ -1,0 +1,6 @@
+*
+!official_livecodebench/
+!official_livecodebench/**
+official_livecodebench/.git
+!scripts/
+!scripts/eval_subset.py
