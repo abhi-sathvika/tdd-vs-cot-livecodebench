@@ -563,3 +563,24 @@ We used ChatGPT to assist with planning the experimental setup, developing and d
 
 ### Human Contributions
 Our team selected the research paper, defined the scope of the replication, configured the experimental environment, executed the experiments, and evaluated the generated solutions. We also analyzed the results, compared the prompting strategies, and determined the limitations and next steps of our investigation.
+
+---
+
+# Files That Must Not Be Committed
+
+The following contain generated data, third-party repositories, environments, or secrets:
+
+```text
+.venv/
+.proxy-venv/
+upstream/
+official_livecodebench/
+runs/
+data_private/
+results/analysis/
+config/local_model.yaml
+.env
+__pycache__/
+```
+
+API keys must never be committed to the repository.
